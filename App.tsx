@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Mascot, Topic, Question } from './types';
 import { TOPICS, fetchQuestionsFromSheet } from './services/googleSheetsService';
+import SpellCheckScreen from './components/SpellCheckScreen';
 
 // Main App Component
 export default function SuperQuizUI() {
@@ -52,6 +53,13 @@ export default function SuperQuizUI() {
 
   const handleTopicClick = async (topic: Topic) => {
     setSelectedTopic(topic);
+
+    // Special handling for Spell Check module
+    if (topic.id === 'spell') {
+      setCurrentScreen('spellCheck');
+      return;
+    }
+
     setIsLoadingQuestions(true);
 
     try {
@@ -545,6 +553,13 @@ export default function SuperQuizUI() {
       {currentScreen === 'login' && <LoginScreen />}
       {currentScreen === 'landing' && <LandingScreen />}
       {currentScreen === 'question' && <QuestionScreen />}
+      {currentScreen === 'spellCheck' && (
+        <SpellCheckScreen
+          onBack={() => setCurrentScreen('landing')}
+          playerName={playerName}
+          mascotEmoji={currentMascot?.emoji || '🦄'}
+        />
+      )}
     </div>
   );
 }
