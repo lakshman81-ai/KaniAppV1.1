@@ -4,14 +4,29 @@ This document explains how to configure Google Sheets URLs for the 4 quiz module
 
 ## Overview
 
-The Super Quiz application now supports 4 different modules, each with its own Google Sheets data source and specific worksheet:
+The Super Quiz application supports 4 different modules with flexible Google Sheets configuration:
 
-1. **Space** 🚀 (Easy difficulty) - Worksheet 1
-2. **Geography** 🌍 (Medium difficulty) - Worksheet 2
-3. **Math** 🔢 (Hard difficulty) - Worksheet 3
-4. **Spell Check** ✏️ (Medium difficulty) - Worksheet 4
+1. **Space** 🚀 (Easy difficulty) - Worksheet No. 1
+2. **Geography** 🌍 (Medium difficulty) - Worksheet No. 2
+3. **Math** 🔢 (Hard difficulty) - Worksheet No. 3
+4. **Spell Check** ✏️ (Medium difficulty) - Worksheet No. 4
 
-Each module can load data from a specific worksheet/tab within a Google Sheet.
+### Configuration Options
+
+**Option 1: Separate Google Sheets (Current Configuration)**
+- Each module has its own dedicated Google Sheet
+- Each sheet contains questions with "Worksheet No." column
+- Questions are filtered by the worksheet number
+
+**Option 2: Single Google Sheet with Multiple Worksheets**
+- All modules share one Google Sheet
+- Questions are organized using the "Worksheet No." column
+- Space questions have Worksheet No. = 1
+- Geography questions have Worksheet No. = 2
+- Math questions have Worksheet No. = 3
+- Spell Check questions have Worksheet No. = 4
+
+Both options work with the same data format!
 
 ## Configuring Google Sheets URLs
 
@@ -99,14 +114,15 @@ Each Google Sheet should follow this CSV format:
 
 ### Header Row (Required):
 ```
-Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note
+Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note,Worksheet No.
 ```
 
 ### Data Rows:
 ```csv
-Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note
-"Who took Lily and Max on their space trip?","Captain Star","Emma","Jake","Columbus","A","Read the story carefully before answering."
-"What planet is known as the Red Planet?","Venus","Mars","Jupiter","Saturn","B",""
+Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note,Worksheet No.
+"Who took Lily and Max on their space trip?","Captain Star","Emma","Jake","Columbus","A","Read the story carefully before answering.",1
+"What planet is known as the Red Planet?","Venus","Mars","Jupiter","Saturn","B","",1
+"What is the capital of France?","London","Berlin","Paris","Madrid","C","",2
 ```
 
 ### Field Descriptions:
@@ -118,6 +134,23 @@ Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note
 - **Answer D**: Fourth answer option (required)
 - **Correct Answer**: The letter of the correct answer: A, B, C, or D (required)
 - **Note**: Optional hint or note to display with the question (optional)
+- **Worksheet No.**: The worksheet number (1, 2, 3, 4, etc.) to group questions (required)
+
+### Multiple Worksheets in Same Google Sheet
+
+You can now store multiple sets of questions in the **same Google Sheet** by using the "Worksheet No." column:
+
+**Example:**
+```csv
+Question,Answer A,Answer B,Answer C,Answer D,Correct Answer,Note,Worksheet No.
+"Space Question 1","A","B","C","D","A","",1
+"Space Question 2","A","B","C","D","B","",1
+"Geography Question 1","A","B","C","D","C","",2
+"Geography Question 2","A","B","C","D","D","",2
+"Math Question 1","A","B","C","D","A","",3
+```
+
+The app will automatically filter questions based on the `worksheetNumber` configured for each topic.
 
 ## Sample Data (Currently Used as Fallback)
 

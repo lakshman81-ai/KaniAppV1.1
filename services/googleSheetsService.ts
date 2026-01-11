@@ -8,7 +8,9 @@ export const SHEET_URLS = {
   spell: 'PLACEHOLDER_SPELL_CHECK_SHEET_URL',
 };
 
-// Topics configuration with Google Sheets URLs and worksheet numbers
+// Topics configuration with Google Sheets URLs
+// Each topic uses a separate Google Sheet (Option 1)
+// The worksheetNumber is used to filter questions from the "Worksheet No." column in the CSV
 export const TOPICS: Topic[] = [
   {
     id: 'space',
@@ -19,8 +21,7 @@ export const TOPICS: Topic[] = [
     solved: 0,
     total: 10,
     sheetUrl: SHEET_URLS.space,
-    worksheetNumber: 1, // Worksheet 1
-    worksheetGid: '0', // Default first worksheet GID (0)
+    worksheetNumber: 1, // Filter questions where "Worksheet No." = 1
   },
   {
     id: 'geography',
@@ -31,8 +32,7 @@ export const TOPICS: Topic[] = [
     solved: 0,
     total: 8,
     sheetUrl: SHEET_URLS.geography,
-    worksheetNumber: 2, // Worksheet 2
-    worksheetGid: undefined, // Will use default or extract from URL
+    worksheetNumber: 2, // Filter questions where "Worksheet No." = 2
   },
   {
     id: 'math',
@@ -43,8 +43,7 @@ export const TOPICS: Topic[] = [
     solved: 0,
     total: 12,
     sheetUrl: SHEET_URLS.math,
-    worksheetNumber: 3, // Worksheet 3
-    worksheetGid: undefined, // Will use default or extract from URL
+    worksheetNumber: 3, // Filter questions where "Worksheet No." = 3
   },
   {
     id: 'spell',
@@ -55,8 +54,7 @@ export const TOPICS: Topic[] = [
     solved: 0,
     total: 7,
     sheetUrl: SHEET_URLS.spell,
-    worksheetNumber: 4, // Worksheet 4
-    worksheetGid: undefined, // Will use default or extract from URL
+    worksheetNumber: 4, // Filter questions where "Worksheet No." = 4
   },
 ];
 
@@ -106,8 +104,9 @@ function buildCsvUrlWithWorksheet(baseUrl: string, worksheetGid?: string): strin
 
 /**
  * Parse CSV data from Google Sheets into Question objects
+ * Now supports "Worksheet No." column for filtering questions by worksheet
  */
-function parseCSVToQuestions(csvText: string, topicId: string): Question[] {
+function parseCSVToQuestions(csvText: string, topicId: string, filterWorksheetNumber?: number): Question[] {
   const lines = csvText.trim().split('\n');
   const questions: Question[] = [];
 
@@ -120,7 +119,17 @@ function parseCSVToQuestions(csvText: string, topicId: string): Question[] {
     const parts = line.split(',').map(part => part.trim().replace(/^"|"$/g, ''));
 
     if (parts.length >= 6) {
-      const [questionText, answerA, answerB, answerC, answerD, correctAnswer, note] = parts;
+      const [questionText, answerA, answerB, answerC, answerD, correctAnswer, note, worksheetNo] = parts;
+
+      // Parse worksheet number from the data (if present)
+      const questionWorksheetNumber = worksheetNo ? parseInt(worksheetNo, 10) : undefined;
+
+      // If filterWorksheetNumber is specified, only include questions from that worksheet
+      if (filterWorksheetNumber !== undefined && questionWorksheetNumber !== undefined) {
+        if (questionWorksheetNumber !== filterWorksheetNumber) {
+          continue; // Skip this question, it's from a different worksheet
+        }
+      }
 
       questions.push({
         id: `${topicId}-q${i}`,
@@ -134,6 +143,7 @@ function parseCSVToQuestions(csvText: string, topicId: string): Question[] {
         ],
         correctAnswer: correctAnswer.toUpperCase(),
         topic: topicId,
+        worksheetNumber: questionWorksheetNumber,
       });
     }
   }
@@ -143,6 +153,7 @@ function parseCSVToQuestions(csvText: string, topicId: string): Question[] {
 
 /**
  * Fetch questions from Google Sheets for a specific topic
+ * Supports filtering questions by "Worksheet No." column
  */
 export async function fetchQuestionsFromSheet(topic: Topic): Promise<Question[]> {
   try {
@@ -152,16 +163,22 @@ export async function fetchQuestionsFromSheet(topic: Topic): Promise<Question[]>
       return getSampleQuestions(topic.id);
     }
 
-    // Build CSV URL with worksheet GID
-    let csvUrl = buildCsvUrlWithWorksheet(topic.sheetUrl, topic.worksheetGid);
+    // Convert the sheet URL to CSV export format if needed (for separate sheets - Option 1)
+    let csvUrl = topic.sheetUrl;
+    if (topic.sheetUrl.includes('/edit')) {
+      csvUrl = topic.sheetUrl.replace('/edit#gid=0', '/export?format=csv').replace('/edit', '/export?format=csv');
+    }
+
+    // If worksheetGid is specified, use it (for single sheet with multiple tabs)
+    if (topic.worksheetGid) {
+      csvUrl = buildCsvUrlWithWorksheet(csvUrl, topic.worksheetGid);
+    }
 
     // Log which worksheet is being loaded
     const worksheetInfo = topic.worksheetNumber
-      ? `Worksheet ${topic.worksheetNumber}`
-      : topic.worksheetGid
-        ? `GID ${topic.worksheetGid}`
-        : 'default worksheet';
-    console.log(`Loading ${topic.name} from ${worksheetInfo}`);
+      ? `filtering Worksheet No. ${topic.worksheetNumber}`
+      : 'all worksheets';
+    console.log(`Loading ${topic.name} from Google Sheet - ${worksheetInfo}`);
 
     // Add cache busting parameter
     const url = csvUrl + (csvUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -172,13 +189,15 @@ export async function fetchQuestionsFromSheet(topic: Topic): Promise<Question[]>
     }
 
     const csvText = await response.text();
-    const questions = parseCSVToQuestions(csvText, topic.id);
+
+    // Parse questions and filter by worksheet number from "Worksheet No." column
+    const questions = parseCSVToQuestions(csvText, topic.id, topic.worksheetNumber);
 
     if (questions.length === 0) {
       throw new Error('No questions found in the sheet');
     }
 
-    console.log(`Successfully loaded ${questions.length} questions for ${topic.name} from ${worksheetInfo}`);
+    console.log(`Successfully loaded ${questions.length} questions for ${topic.name} (${worksheetInfo})`);
     return questions;
   } catch (error) {
     console.error(`Error fetching questions for ${topic.name}:`, error);

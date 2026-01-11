@@ -33,6 +33,7 @@ export interface Question {
   answers: Answer[];
   correctAnswer: string;
   topic: string;
+  worksheetNumber?: number; // Worksheet number from Google Sheets data
 }
 
 export interface Answer {
