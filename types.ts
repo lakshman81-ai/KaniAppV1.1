@@ -22,6 +22,8 @@ export interface Topic {
   solved: number;
   total: number;
   sheetUrl: string; // Google Sheets URL for this module
+  worksheetNumber?: number; // Optional worksheet/tab number (e.g., 1, 2, 3, 4)
+  worksheetGid?: string; // Optional worksheet GID for Google Sheets
 }
 
 export interface Question {

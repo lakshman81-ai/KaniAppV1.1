@@ -8,7 +8,7 @@ export const SHEET_URLS = {
   spell: 'PLACEHOLDER_SPELL_CHECK_SHEET_URL',
 };
 
-// Topics configuration with Google Sheets URLs
+// Topics configuration with Google Sheets URLs and worksheet numbers
 export const TOPICS: Topic[] = [
   {
     id: 'space',
@@ -18,7 +18,9 @@ export const TOPICS: Topic[] = [
     difficulty: 'Easy',
     solved: 0,
     total: 10,
-    sheetUrl: SHEET_URLS.space
+    sheetUrl: SHEET_URLS.space,
+    worksheetNumber: 1, // Worksheet 1
+    worksheetGid: '0', // Default first worksheet GID (0)
   },
   {
     id: 'geography',
@@ -28,7 +30,9 @@ export const TOPICS: Topic[] = [
     difficulty: 'Medium',
     solved: 0,
     total: 8,
-    sheetUrl: SHEET_URLS.geography
+    sheetUrl: SHEET_URLS.geography,
+    worksheetNumber: 2, // Worksheet 2
+    worksheetGid: undefined, // Will use default or extract from URL
   },
   {
     id: 'math',
@@ -38,7 +42,9 @@ export const TOPICS: Topic[] = [
     difficulty: 'Hard',
     solved: 0,
     total: 12,
-    sheetUrl: SHEET_URLS.math
+    sheetUrl: SHEET_URLS.math,
+    worksheetNumber: 3, // Worksheet 3
+    worksheetGid: undefined, // Will use default or extract from URL
   },
   {
     id: 'spell',
@@ -48,9 +54,55 @@ export const TOPICS: Topic[] = [
     difficulty: 'Medium',
     solved: 0,
     total: 7,
-    sheetUrl: SHEET_URLS.spell
+    sheetUrl: SHEET_URLS.spell,
+    worksheetNumber: 4, // Worksheet 4
+    worksheetGid: undefined, // Will use default or extract from URL
   },
 ];
+
+/**
+ * Build CSV URL with worksheet GID parameter
+ */
+function buildCsvUrlWithWorksheet(baseUrl: string, worksheetGid?: string): string {
+  // Extract GID from existing URL if present
+  const gidMatch = baseUrl.match(/[?&]gid=(\d+)/);
+  const existingGid = gidMatch ? gidMatch[1] : null;
+
+  // Use provided GID, or existing GID, or default to '0' (first worksheet)
+  const gid = worksheetGid || existingGid || '0';
+
+  // Handle different Google Sheets URL formats
+  if (baseUrl.includes('/pub?')) {
+    // Published sheet format: ensure gid and output=csv are present
+    if (baseUrl.includes('gid=')) {
+      // Replace existing gid
+      return baseUrl.replace(/gid=\d+/, `gid=${gid}`);
+    } else {
+      // Add gid parameter
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${separator}gid=${gid}&single=true&output=csv`;
+    }
+  } else if (baseUrl.includes('/export')) {
+    // Export format
+    if (baseUrl.includes('gid=')) {
+      // Replace existing gid
+      return baseUrl.replace(/gid=\d+/, `gid=${gid}`);
+    } else {
+      // Add gid parameter
+      const separator = baseUrl.includes('?') ? '&' : '?';
+      return `${baseUrl}${separator}gid=${gid}`;
+    }
+  } else if (baseUrl.includes('/edit')) {
+    // Convert edit URL to export format with gid
+    const sheetId = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+    if (sheetId) {
+      return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+    }
+  }
+
+  // Default: return URL as-is and hope for the best
+  return baseUrl;
+}
 
 /**
  * Parse CSV data from Google Sheets into Question objects
@@ -100,11 +152,16 @@ export async function fetchQuestionsFromSheet(topic: Topic): Promise<Question[]>
       return getSampleQuestions(topic.id);
     }
 
-    // Convert the sheet URL to CSV export format if needed
-    let csvUrl = topic.sheetUrl;
-    if (topic.sheetUrl.includes('/edit')) {
-      csvUrl = topic.sheetUrl.replace('/edit#gid=0', '/export?format=csv').replace('/edit', '/export?format=csv');
-    }
+    // Build CSV URL with worksheet GID
+    let csvUrl = buildCsvUrlWithWorksheet(topic.sheetUrl, topic.worksheetGid);
+
+    // Log which worksheet is being loaded
+    const worksheetInfo = topic.worksheetNumber
+      ? `Worksheet ${topic.worksheetNumber}`
+      : topic.worksheetGid
+        ? `GID ${topic.worksheetGid}`
+        : 'default worksheet';
+    console.log(`Loading ${topic.name} from ${worksheetInfo}`);
 
     // Add cache busting parameter
     const url = csvUrl + (csvUrl.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -121,6 +178,7 @@ export async function fetchQuestionsFromSheet(topic: Topic): Promise<Question[]>
       throw new Error('No questions found in the sheet');
     }
 
+    console.log(`Successfully loaded ${questions.length} questions for ${topic.name} from ${worksheetInfo}`);
     return questions;
   } catch (error) {
     console.error(`Error fetching questions for ${topic.name}:`, error);
