@@ -34,3 +34,4 @@ yarn-error.log*
 .settings/
 *.sublime-project
 *.sublime-workspace
+*.zip
